@@ -14,11 +14,11 @@ from datetime import datetime
 class DatabaseManager:
     def __init__(self):
         self.config = {
-            'host': '175.157.26.13',          # 🌍 your real global IP address
-            'user': 'cozyuser',
-            'password': 'strongpassword123',
-            'database': 'cozy_comfort_db',
-            'port': 4000,
+            'host': os.environ.get('DB_HOST', 'localhost'),
+            'user': os.environ.get('DB_USER', 'root'),
+            'password': os.environ.get('DB_PASSWORD', ''),
+            'database': os.environ.get('DB_NAME', 'cozy_comfort_db'),
+            'port': int(os.environ.get('DB_PORT', 3306)),
             'charset': 'utf8mb4',
         }
         self.init_database()
@@ -789,3 +789,5 @@ if __name__ == '__main__':
 
     #pip install flask flask-cors mysql-connector-python
     #Python web_server.py
+
+    
