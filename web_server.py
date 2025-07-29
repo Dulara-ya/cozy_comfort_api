@@ -18,7 +18,7 @@ class DatabaseManager:
             'user': 'cozyuser',
             'password': 'strongpassword123',
             'database': 'cozy_comfort_db',
-            'port': 3306,
+            'port': 4000,
             'charset': 'utf8mb4',
         }
         self.init_database()
