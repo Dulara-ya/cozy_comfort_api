@@ -20,7 +20,7 @@ class DatabaseManager:
             'database': os.environ.get('DB_NAME', 'cozy_comfort_db'),
             'port': int(os.environ.get('DB_PORT', 3306)),
             'charset': 'utf8mb4',
-        }
+           }
         self.init_database()
 
     def get_connection(self):
