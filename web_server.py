@@ -1,5 +1,5 @@
 
-# Cozy Comfort Web Server - Final All-in-One Version
+# Cozy Comfort Web Server 
 
 import os
 import traceback
