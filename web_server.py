@@ -23,11 +23,11 @@ class DatabaseManager:
     """
     def __init__(self):
         self.config = {
-            'host': os.environ.get('DB_HOST', 'localhost'),
-            'user': os.environ.get('DB_USER', 'root'),
-            'password': os.environ.get('DB_PASSWORD', ''),
-            'database': os.environ.get('DB_NAME', 'cozy_comfort_db'),
-            'port': int(os.environ.get('DB_PORT', 3306)),
+            'host': os.environ.get('DB_HOST', 'dpg-d28qpd8gjchc73c0m2a0-a'),
+            'user': os.environ.get('DB_USER', 'cozy_comfort_db_t8zo_user'),
+            'password': os.environ.get('DB_PASSWORD', 'WiXhnxJ0ETbi8W7F7AUGPPRhcx2GRukr'),
+            'database': os.environ.get('DB_NAME', 'cozy_comfort_db_t8zo'),
+            'port': int(os.environ.get('DB_PORT', 5432)),
             'charset': 'utf8mb4',
         }
         self.init_database()
