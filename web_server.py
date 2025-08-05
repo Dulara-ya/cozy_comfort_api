@@ -25,16 +25,15 @@ class DatabaseManager:
     """
     def __init__(self):
         # --- CHANGE THIS ENTIRE BLOCK ---
-        self.config = {
-            'host': os.environ.get('MYSQL_HOST'),
-            'user': os.environ.get('MYSQL_USER'),
-            'password': os.environ.get('MYSQL_PASSWORD'),
-            'database': os.environ.get('MYSQL_DATABASE'),
-            'port': int(os.environ.get('MYSQL_PORT', 3306)),
-            'charset': 'utf8mb4',
-            'ssl_ca': '/opt/render/etc/tls/ca-bundle.crt.pem',
-            'ssl_verify_identity': True
-        }
+       # In web_server.py -> DatabaseManager -> __init__
+self.config = {
+    'host': os.environ.get('MYSQL_HOST'),
+    'user': os.environ.get('MYSQL_USER'),
+    'password': os.environ.get('MYSQL_PASSWORD'),
+    'database': os.environ.get('MYSQL_DATABASE'),
+    'port': int(os.environ.get('MYSQL_PORT', 3306))
+    # No 'charset' or 'ssl' lines needed for TiDB Cloud
+}
         # ---------------------------------
         self.init_database()
 
