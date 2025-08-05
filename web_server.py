@@ -16,24 +16,26 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # ================================
 # DATABASE SETUP AND CONNECTION
 # ================================
+# In web_server.py
+
 class DatabaseManager:
     """
     Manages the MySQL database connection, setup, and initial data population.
     The setup process is triggered automatically when the server starts.
     """
     def __init__(self):
+        # --- CHANGE THIS ENTIRE BLOCK ---
         self.config = {
-            'host': os.environ.get('DB_HOST', 'localhost'),
-            'user': os.environ.get('DB_USER', 'root'),
-            'password': os.environ.get('DB_PASSWORD', ''),
-            'database': os.environ.get('DB_NAME', 'cozy_comfort_db'),
-            'port': int(os.environ.get('DB_PORT', 3306)),
+            'host': os.environ.get('MYSQL_HOST'),
+            'user': os.environ.get('MYSQL_USER'),
+            'password': os.environ.get('MYSQL_PASSWORD'),
+            'database': os.environ.get('MYSQL_DATABASE'),
+            'port': int(os.environ.get('MYSQL_PORT', 3306)),
             'charset': 'utf8mb4',
-            # -- ADD THESE TWO LINES FOR RENDER DATABASE --
             'ssl_ca': '/opt/render/etc/tls/ca-bundle.crt.pem',
             'ssl_verify_identity': True
-            # ---------------------------------------------
         }
+        # ---------------------------------
         self.init_database()
 
     def get_connection(self):
