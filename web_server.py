@@ -1,6 +1,5 @@
-# web_server.py
+
 # Cozy Comfort Web Server - Final All-in-One Version
-# This script automatically handles database creation, table setup, and data insertion before starting the web server.
 
 import os
 import traceback
@@ -13,14 +12,10 @@ from flask import Flask, request, jsonify, render_template_string, session
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# ================================
-# DATABASE SETUP AND CONNECTION
-# ================================
-# In web_server.py
 
-# ================================
+
 # DATABASE SETUP AND CONNECTION
-# ================================
+
 class DatabaseManager:
     """
     Manages the MySQL database connection, setup, and initial data population.
@@ -123,9 +118,10 @@ class DatabaseManager:
         finally:
             cursor.close()
             conn.close()
-# ================================
+
+
 # SERVICE LAYER
-# ================================
+
 class BaseService:
     db = DatabaseManager()
     def handle_error(self, e, operation):
@@ -324,9 +320,9 @@ class OrderService(BaseService):
         except mysql.connector.Error as e: conn.rollback(); return self.handle_error(e, "updating order status")
         finally: conn.close()
 
-# ================================
+
 # FLASK APP & ROUTES
-# ================================
+
 app = Flask(__name__)
 app.secret_key = os.urandom(24) 
 CORS(app, supports_credentials=True)
@@ -389,9 +385,9 @@ def create_seller_order(): return seller_service.create_order(session['user_id']
 @role_required(['manufacturer', 'distributor'])
 def update_order_status(order_id): return order_service.update_status(order_id, request.json['status'], session['user_id'])
 
-# ================================
-# HTML TEMPLATE
-# ================================
+
+# HTML 
+
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
