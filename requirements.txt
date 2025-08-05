@@ -2,3 +2,8 @@ flask
 flask-cors 
 mysql-connector-python 
 gunicorn
+Flask
+gunicorn
+mysql-connector-python
+Werkzeug
+flask-cors
