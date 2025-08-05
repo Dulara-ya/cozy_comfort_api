@@ -18,23 +18,22 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # ================================
 # In web_server.py
 
+# ================================
+# DATABASE SETUP AND CONNECTION
+# ================================
 class DatabaseManager:
     """
     Manages the MySQL database connection, setup, and initial data population.
     The setup process is triggered automatically when the server starts.
     """
     def __init__(self):
-        # --- CHANGE THIS ENTIRE BLOCK ---
-       # In web_server.py -> DatabaseManager -> __init__
-self.config = {
-    'host': os.environ.get('MYSQL_HOST'),
-    'user': os.environ.get('MYSQL_USER'),
-    'password': os.environ.get('MYSQL_PASSWORD'),
-    'database': os.environ.get('MYSQL_DATABASE'),
-    'port': int(os.environ.get('MYSQL_PORT', 3306))
-    # No 'charset' or 'ssl' lines needed for TiDB Cloud
-}
-        # ---------------------------------
+        self.config = {
+            'host': os.environ.get('MYSQL_HOST'),
+            'user': os.environ.get('MYSQL_USER'),
+            'password': os.environ.get('MYSQL_PASSWORD'),
+            'database': os.environ.get('MYSQL_DATABASE'),
+            'port': int(os.environ.get('MYSQL_PORT', 3306))
+        }
         self.init_database()
 
     def get_connection(self):
@@ -55,7 +54,7 @@ self.config = {
             
             conn = mysql.connector.connect(**temp_config)
             cursor = conn.cursor()
-            cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+            cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{db_name}`")
             print(f"✅ Database '{db_name}' is ready.")
             cursor.close()
             conn.close()
@@ -124,7 +123,6 @@ self.config = {
         finally:
             cursor.close()
             conn.close()
-
 # ================================
 # SERVICE LAYER
 # ================================
