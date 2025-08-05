@@ -1,0 +1,36 @@
+# This is the render.yaml file.
+# It tells Render how to build your app and database.
+
+databases:
+  - name: cozy-mysql-database  # Give a name to your new MySQL database
+    databaseName: cozymysql      # The internal name of the database
+    user: cozyuser             # The internal username
+    plan: free                 # Use the free plan for the database
+
+services:
+  - type: web
+    name: cozy-comfort-app       # A name for your web service
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn web_server:app"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
+      # This part automatically connects the database to the web service
+      - fromDatabase:
+          name: cozy-mysql-database # This MUST match the database name above
+          # Render will create these environment variables for your code to use.
+          # Your Python code is already looking for these names.
+          envVarKey: MYSQL_HOST
+      - fromDatabase:
+          name: cozy-mysql-database
+          envVarKey: MYSQL_USER
+      - fromDatabase:
+          name: cozy-mysql-database
+          envVarKey: MYSQL_PASSWORD
+      - fromDatabase:
+          name: cozy-mysql-database
+          envVarKey: MYSQL_DATABASE
+      - fromDatabase:
+          name: cozy-mysql-database
+          envVarKey: MYSQL_PORT
