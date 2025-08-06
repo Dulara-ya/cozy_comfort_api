@@ -1,3 +1,4 @@
+
 # Cozy Comfort Web Server 
 
 import os
@@ -93,7 +94,7 @@ class DatabaseManager:
         cursor = conn.cursor()
         try:
             cursor.execute("SELECT COUNT(*) FROM users")
-            if cursor.fetchone() > 0:
+            if cursor.fetchone()[0] > 0:
                 print("  - Database already contains data. Skipping sample data insertion.")
                 return
 
@@ -223,27 +224,7 @@ class DistributorService(BaseService):
             return jsonify({'success': True, 'message': f'Successfully ordered {quantity} units.'})
         except mysql.connector.Error as e: conn.rollback(); return self.handle_error(e, "ordering from manufacturer")
         finally: conn.close()
-
-    def add_seller(self, distributor_id, data):
-        conn = self.db.get_connection()
-        if not conn: return jsonify({'error': 'DB connection failed'}), 500
-        try:
-            username, email, password, company_name = data.get('username'), data.get('email'), data.get('password'), data.get('company_name')
-            if not all([username, email, password, company_name]): return jsonify({'error': 'Missing required fields'}), 400
-            hashed_password = generate_password_hash(password)
-            conn.start_transaction()
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO users (username, email, password, user_type, company_name) VALUES (%s, %s, %s, 'seller', %s)", (username, email, hashed_password, company_name))
-            seller_id = cursor.lastrowid
-            cursor.execute("INSERT INTO distributor_sellers (distributor_id, seller_id) VALUES (%s, %s)", (distributor_id, seller_id))
-            conn.commit()
-            return jsonify({'success': True, 'message': f"Seller '{company_name}' created and assigned."})
-        except mysql.connector.Error as e:
-            conn.rollback()
-            if e.errno == 1062: return jsonify({'error': 'Username or email already exists.'}), 409
-            return self.handle_error(e, "adding seller")
-        finally: conn.close()
-
+        
 class SellerService(BaseService):
     def get_dashboard_data(self, user_id):
         conn = self.db.get_connection()
@@ -323,23 +304,6 @@ class SellerService(BaseService):
         except (mysql.connector.Error, InvalidOperation, ValueError, TypeError) as e: conn.rollback(); return self.handle_error(e, "creating order")
         finally: conn.close()
 
-    def add_distributor(self, data):
-        conn = self.db.get_connection()
-        if not conn: return jsonify({'error': 'DB connection failed'}), 500
-        try:
-            username, email, password, company_name = data.get('username'), data.get('email'), data.get('password'), data.get('company_name')
-            if not all([username, email, password, company_name]): return jsonify({'error': 'Missing required fields'}), 400
-            hashed_password = generate_password_hash(password)
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO users (username, email, password, user_type, company_name) VALUES (%s, %s, %s, 'distributor', %s)", (username, email, hashed_password, company_name))
-            conn.commit()
-            return jsonify({'success': True, 'message': f"Distributor '{company_name}' created."})
-        except mysql.connector.Error as e:
-            conn.rollback()
-            if e.errno == 1062: return jsonify({'error': 'Username or email already exists.'}), 409
-            return self.handle_error(e, "adding distributor")
-        finally: conn.close()
-
 class OrderService(BaseService):
     def update_status(self, order_id, status, user_id):
         conn = self.db.get_connection()
@@ -408,10 +372,6 @@ def update_mfg_inventory(): return mfg_service.update_inventory(request.json['pr
 @login_required
 @role_required(['distributor'])
 def order_from_mfg(): return dist_service.order_from_manufacturer(request.json['product_id'], request.json['quantity'], session['user_id'])
-@app.route('/api/distributor/seller', methods=['POST'])
-@login_required
-@role_required(['distributor'])
-def add_seller(): return dist_service.add_seller(session['user_id'], request.json)
 @app.route('/api/seller/stock_order', methods=['POST'])
 @login_required
 @role_required(['seller'])
@@ -420,10 +380,6 @@ def order_from_dist(): return seller_service.order_from_distributor(session['use
 @login_required
 @role_required(['seller'])
 def create_seller_order(): return seller_service.create_order(session['user_id'], request.json)
-@app.route('/api/seller/distributor', methods=['POST'])
-@login_required
-@role_required(['seller'])
-def add_distributor(): return seller_service.add_distributor(request.json)
 @app.route('/api/order/<int:order_id>/status', methods=['PUT'])
 @login_required
 @role_required(['manufacturer', 'distributor'])
@@ -503,21 +459,18 @@ HTML_TEMPLATE = """
         function renderUserDisplay() { document.getElementById('user-display').innerHTML = currentUser ? `<span>Logged in as <strong>${currentUser.company_name}</strong></span><button class="btn btn-danger" onclick="performLogout()">Logout</button>` : ''; }
         function handleLoggedOutState() { currentUser = null; renderUserDisplay(); document.getElementById('content-area').innerHTML = `<div class="card"><div class="card-header"><h3>Welcome to the Supply Chain Portal</h3></div><div class="card-content" style="text-align:center;"><p style="font-size:1.1rem; color:var(--text-secondary); margin: 1rem 0 2.5rem;">Please select your role to log in and manage your operations.</p><div style="display:flex; justify-content:center; flex-wrap: wrap; gap: 1.5rem;"><button class="btn btn-primary" onclick="openLoginModal('cozy_mfg', 'Manufacturer')">🏭 Login as Manufacturer</button><button class="btn btn-primary" onclick="openLoginModal('metro_dist', 'Distributor')">📦 Login as Distributor</button><button class="btn btn-primary" onclick="openLoginModal('comfort_store', 'Seller')">🏪 Login as Seller</button></div></div></div>`; }
         function renderTable(headers, rows) { const head = `<thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>`; const body = `<tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}</tbody>`; return `<div class="card-content" style="overflow-x:auto;"><table class="table">${head}${body}</table></div>`; }
-        async function loadDashboard() { document.getElementById('content-area').innerHTML = '<div class="loading-spinner"></div>'; if (!currentUser) { handleLoggedOutState(); return; } try { const data = await api('/dashboard'); let html = ''; if (currentUser.type === 'manufacturer') { html += `<div class="card"><div class="card-header"><h3>Inventory</h3><button class="btn btn-primary" onclick="openNewProductModal()">+ New Product</button></div>${renderTable(['Product', 'Model', 'Stock', 'Actions'], data.inventory.map(p => [p.name, p.model, `<strong>${p.quantity}</strong> units`, `<button class="btn btn-secondary" onclick='openMfgUpdateModal(${JSON.stringify(p)})'>Edit Stock</button>`]))}</div>`; html += `<div class="card"><div class="card-header"><h3>All Customer Orders</h3></div>${renderTable(['Order #', 'Seller', 'Distributor', 'Status', 'Date', 'Actions'], data.orders.map(o => [o.order_number, o.seller, o.distributor || 'N/A', `<span class="status status-${o.status}">${o.status}</span>`, new Date(o.created_at).toLocaleDateString(), o.status === 'pending' ? `<button class="btn btn-primary" onclick="updateOrderStatus(${o.id}, 'confirmed')">Confirm</button>` : 'N/A']))}</div>`; } if (currentUser.type === 'distributor') { html += `<div class="card"><div class="card-header"><h3>Inventory & Ordering</h3><button class="btn btn-primary" onclick="openNewSellerModal()">+ Add New Seller</button></div>${renderTable(['Product', 'Model', 'Price', 'Your Stock', 'Mfg. Stock', 'Actions'], data.inventory.map(p => [p.name, p.model, `$${p.price}`, `<strong>${p.your_stock}</strong>`, p.manufacturer_stock, `<button class="btn btn-primary" onclick='openDistOrderModal(${JSON.stringify(p)})'>Order More</button>`]))}</div>`; html += `<div class="card"><div class="card-header"><h3>Customer Orders to Fulfill</h3></div>${renderTable(['Order #', 'Customer', 'From Seller', 'Status', 'Date', 'Actions'], data.orders.map(o => [o.order_number, o.customer_name, o.seller, `<span class="status status-${o.status}">${o.status}</span>`, new Date(o.created_at).toLocaleDateString(), o.status === 'pending' ? `<button class="btn btn-primary" onclick="updateOrderStatus(${o.id}, 'confirmed')">Confirm</button>` : 'N/A']))}</div>`; } if (currentUser.type === 'seller') { productCatalog = data.products; html += `<div class="card"><div class="card-header"><h3>Product Catalog & Inventory</h3><div><button class="btn btn-secondary" onclick="openNewDistributorModal()">+ Add Distributor</button> <button class="btn btn-primary" onclick="openSellerOrderModal()">+ New Customer Order</button></div></div>${renderTable(['Product', 'Model', 'Price', 'Your Stock', 'Distributor Stock', 'Actions'], data.products.map(p => [p.name, p.model, `$${p.price}`, `<strong>${p.seller_stock}</strong>`, p.distributor_stock, `<button class="btn btn-primary" onclick='openSellerStockOrderModal(${JSON.stringify(p)})'>Order Stock</button>`]))}</div>`; html += `<div class="card"><div class="card-header"><h3>Your Customer Orders</h3></div>${renderTable(['Order #', 'Customer', 'Amount', 'Status', 'Date', 'Confirmed By'], data.orders.map(o => [o.order_number, o.customer_name, `$${Number(o.total_amount).toFixed(2)}`, `<span class="status status-${o.status}">${o.status}</span>`, new Date(o.created_at).toLocaleDateString(), o.confirmer_name || '<i>Pending</i>']))}</div>`; } document.getElementById('content-area').innerHTML = html; } catch (err) { document.getElementById('content-area').innerHTML = `<div class="alert alert-danger">Could not load dashboard.</div>`; } }
+        async function loadDashboard() { document.getElementById('content-area').innerHTML = '<div class="loading-spinner"></div>'; if (!currentUser) { handleLoggedOutState(); return; } try { const data = await api('/dashboard'); let html = ''; if (currentUser.type === 'manufacturer') { html += `<div class="card"><div class="card-header"><h3>Inventory</h3><button class="btn btn-primary" onclick="openNewProductModal()">+ New Product</button></div>${renderTable(['Product', 'Model', 'Stock', 'Actions'], data.inventory.map(p => [p.name, p.model, `<strong>${p.quantity}</strong> units`, `<button class="btn btn-secondary" onclick='openMfgUpdateModal(${JSON.stringify(p)})'>Edit Stock</button>`]))}</div>`; html += `<div class="card"><div class="card-header"><h3>All Customer Orders</h3></div>${renderTable(['Order #', 'Seller', 'Distributor', 'Status', 'Date', 'Actions'], data.orders.map(o => [o.order_number, o.seller, o.distributor || 'N/A', `<span class="status status-${o.status}">${o.status}</span>`, new Date(o.created_at).toLocaleDateString(), o.status === 'pending' ? `<button class="btn btn-primary" onclick="updateOrderStatus(${o.id}, 'confirmed')">Confirm</button>` : 'N/A']))}</div>`; } if (currentUser.type === 'distributor') { html += `<div class="card"><div class="card-header"><h3>Inventory & Ordering</h3></div>${renderTable(['Product', 'Model', 'Price', 'Your Stock', 'Mfg. Stock', 'Actions'], data.inventory.map(p => [p.name, p.model, `$${p.price}`, `<strong>${p.your_stock}</strong>`, p.manufacturer_stock, `<button class="btn btn-primary" onclick='openDistOrderModal(${JSON.stringify(p)})'>Order More</button>`]))}</div>`; html += `<div class="card"><div class="card-header"><h3>Customer Orders to Fulfill</h3></div>${renderTable(['Order #', 'Customer', 'From Seller', 'Status', 'Date', 'Actions'], data.orders.map(o => [o.order_number, o.customer_name, o.seller, `<span class="status status-${o.status}">${o.status}</span>`, new Date(o.created_at).toLocaleDateString(), o.status === 'pending' ? `<button class="btn btn-primary" onclick="updateOrderStatus(${o.id}, 'confirmed')">Confirm</button>` : 'N/A']))}</div>`; } if (currentUser.type === 'seller') { productCatalog = data.products; html += `<div class="card"><div class="card-header"><h3>Product Catalog & Inventory</h3><button class="btn btn-primary" onclick="openSellerOrderModal()">+ New Customer Order</button></div>${renderTable(['Product', 'Model', 'Price', 'Your Stock', 'Distributor Stock', 'Actions'], data.products.map(p => [p.name, p.model, `$${p.price}`, `<strong>${p.seller_stock}</strong>`, p.distributor_stock, `<button class="btn btn-primary" onclick='openSellerStockOrderModal(${JSON.stringify(p)})'>Order Stock</button>`]))}</div>`; html += `<div class="card"><div class="card-header"><h3>Your Customer Orders</h3></div>${renderTable(['Order #', 'Customer', 'Amount', 'Status', 'Date', 'Confirmed By'], data.orders.map(o => [o.order_number, o.customer_name, `$${Number(o.total_amount).toFixed(2)}`, `<span class="status status-${o.status}">${o.status}</span>`, new Date(o.created_at).toLocaleDateString(), o.confirmer_name || '<i>Pending</i>']))}</div>`; } document.getElementById('content-area').innerHTML = html; } catch (err) { document.getElementById('content-area').innerHTML = `<div class="alert alert-danger">Could not load dashboard.</div>`; } }
         function openModal(html) { document.getElementById('modal-content-host').innerHTML = html; document.getElementById('formModal').style.display = 'block'; }
         function closeModal() { document.getElementById('formModal').style.display = 'none'; }
         function openLoginModal(username, roleName) { openModal(`<h2>${roleName} Login</h2><p style="color:var(--text-secondary)">All sample users have the password: <strong>pass</strong></p><div id="login-alert-container"></div><form id="loginForm" onsubmit="event.preventDefault(); performLogin();"><div class="form-group"><label>Username</label><input name="username" value="${username}" required></div><div class="form-group"><label>Password</label><input name="password" type="password" required></div><button type="submit" class="btn btn-primary" style="width:100%;padding:1rem;">Login</button></form>`); document.getElementById('loginForm').password.focus(); }
         function openNewProductModal() { openModal(`<h2>Create New Product</h2><form id="newProductForm" onsubmit="event.preventDefault(); submitNewProduct();"><div id="product-alert-container"></div><div class="form-grid"><div class="form-group full-width"><label>Product Name</label><input name="name" required></div><div class="form-group"><label>Model</label><input name="model" required></div><div class="form-group"><label>Material</label><input name="material"></div><div class="form-group"><label>Size</label><input name="size"></div><div class="form-group"><label>Color</label><input name="color"></div><div class="form-group"><label>Price (USD)</label><input name="price" type="number" step="0.01" required></div><div class="form-group"><label>Initial Stock Quantity</label><input name="initial_stock" type="number" step="1" required></div></div><button type="submit" class="btn btn-primary" style="width:100%;padding:1rem;margin-top:1rem;">Create Product</button></form>`); }
         function openMfgUpdateModal(p) { openModal(`<h2>Update Inventory</h2><p>${p.name}</p><div class="form-group"><label>New Quantity</label><input id="mfgQty" type="number" value="${p.quantity}"></div><button class="btn btn-primary" onclick="submitMfgUpdate(${p.product_id})">Update</button>`); }
         function openDistOrderModal(p) { openModal(`<h2>Order from Manufacturer</h2><p>${p.name}</p><div class="form-group"><label>Quantity</label><input id="distQty" type="number" min="1"></div><button class="btn btn-primary" onclick="submitDistOrder(${p.id})">Order</button>`); }
-        function openNewSellerModal() { openModal(`<h2>Create New Seller</h2><p>This seller will be automatically assigned to you.</p><div id="user-alert-container"></div><form id="newUserForm" onsubmit="event.preventDefault(); submitNewUser('distributor/seller');"><div class="form-grid"><div class="form-group"><label>Company Name</label><input name="company_name" required></div><div class="form-group"><label>Username</label><input name="username" required></div><div class="form-group"><label>Email</label><input name="email" type="email" required></div><div class="form-group"><label>Password</label><input name="password" type="password" required></div></div><button type="submit" class="btn btn-primary" style="width:100%;padding:1rem;margin-top:1rem;">Create Seller</button></form>`); }
-        function openNewDistributorModal() { openModal(`<h2>Create New Distributor</h2><div id="user-alert-container"></div><form id="newUserForm" onsubmit="event.preventDefault(); submitNewUser('seller/distributor');"><div class="form-grid"><div class="form-group"><label>Company Name</label><input name="company_name" required></div><div class="form-group"><label>Username</label><input name="username" required></div><div class="form-group"><label>Email</label><input name="email" type="email" required></div><div class="form-group"><label>Password</label><input name="password" type="password" required></div></div><button type="submit" class="btn btn-primary" style="width:100%;padding:1rem;margin-top:1rem;">Create Distributor</button></form>`); }
         function openSellerStockOrderModal(p) { openModal(`<h2>Order from Distributor</h2><p>${p.name}</p><p>Distributor has: <strong>${p.distributor_stock}</strong> units</p><div class="form-group"><label>Quantity</label><input id="sellerQty" type="number" min="1" max="${p.distributor_stock}"></div><button class="btn btn-primary" onclick="submitSellerStockOrder(${p.id})">Order</button>`); }
         function openSellerOrderModal() { const list = productCatalog.map(p => `<div style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem;border-bottom:1px solid var(--border-color)"><span><strong>${p.name}</strong><br><small style="color:var(--text-secondary)">Available: ${p.seller_stock + p.distributor_stock}</small></span><input type="number" class="order-item" min="0" data-id="${p.id}" data-price="${p.price}" placeholder="0" style="width:70px"></div>`).join(''); openModal(`<h2>New Customer Order</h2><div class="form-group"><label>Customer Name</label><input id="custName"></div><div class="form-group"><label>Customer Email</label><input id="custEmail"></div><h3 style="margin-top:1.5rem;color:var(--text-secondary)">Items</h3><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border-color);border-radius:8px;padding:0.5rem">${list}</div><button class="btn btn-primary" style="width:100%;padding:1rem;margin-top:1.5rem" onclick="submitSellerOrder()">Create Order</button>`); }
         async function submitNewProduct() { const form = document.getElementById('newProductForm'); const payload = { name: form.name.value, model: form.model.value, material: form.material.value, size: form.size.value, color: form.color.value, price: form.price.value, initial_stock: form.initial_stock.value }; if (!payload.name || !payload.model || !payload.price || !payload.initial_stock) return showAlert('Please fill out all required fields.', true, 'product-alert-container'); await api('/manufacturer/product', { method: 'POST', body: JSON.stringify(payload) }).then(d => { showAlert(d.message, false); closeModal(); loadDashboard(); }).catch(err => showAlert(err.message, true, 'product-alert-container')); }
         async function submitMfgUpdate(product_id) { const quantity = parseInt(document.getElementById('mfgQty').value); await api('/manufacturer/inventory', { method: 'PUT', body: JSON.stringify({ product_id, quantity }) }).then(d => { showAlert(d.message, false); closeModal(); loadDashboard(); }).catch(() => {}); }
         async function submitDistOrder(product_id) { const quantity = parseInt(document.getElementById('distQty').value); if (!quantity || quantity <= 0) return showAlert('Quantity must be greater than 0.', true); await api('/distributor/order', { method: 'POST', body: JSON.stringify({ product_id, quantity }) }).then(d => { showAlert(d.message, false); closeModal(); loadDashboard(); }).catch(() => {}); }
-        async function submitNewUser(endpoint) { const form = document.getElementById('newUserForm'); const payload = { company_name: form.company_name.value, username: form.username.value, email: form.email.value, password: form.password.value }; if (!payload.company_name || !payload.username || !payload.email || !payload.password) return showAlert('Please fill out all fields.', true, 'user-alert-container'); await api(`/${endpoint}`, { method: 'POST', body: JSON.stringify(payload) }).then(d => { showAlert(d.message, false); closeModal(); }).catch(err => showAlert(err.message, true, 'user-alert-container')); }
         async function submitSellerStockOrder(product_id) { const quantity = parseInt(document.getElementById('sellerQty').value); if (!quantity || quantity <= 0) return showAlert('Quantity must be greater than 0.', true); await api('/seller/stock_order', { method: 'POST', body: JSON.stringify({ product_id, quantity }) }).then(d => { showAlert(d.message, false); closeModal(); loadDashboard(); }).catch(() => {}); }
         async function submitSellerOrder() { const items = Array.from(document.querySelectorAll('.order-item')).map(i => ({ product_id: i.dataset.id, quantity: parseInt(i.value) || 0, price: i.dataset.price })).filter(i => i.quantity > 0); if (items.length === 0) return showAlert('Please add at least one item.', true); const customer_name = document.getElementById('custName').value.trim(); if (!customer_name) return showAlert('Customer name is required.', true); const payload = { customer_name, customer_email: document.getElementById('custEmail').value.trim(), items }; await api('/seller/order', { method: 'POST', body: JSON.stringify(payload) }).then(d => { showAlert(d.message, false); closeModal(); loadDashboard(); }).catch(() => {}); }
         async function updateOrderStatus(order_id, status) { await api(`/order/${order_id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }).then(d => { showAlert(d.message, false); loadDashboard(); }).catch(() => {}); }
