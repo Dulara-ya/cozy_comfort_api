@@ -536,4 +536,4 @@ if __name__ == '__main__':
     print("🚀 Cozy Comfort Web Server Starting...")
     port = int(os.environ.get('PORT', 5021))
     print(f"🌐 Server will be available at: http://localhost:{port}")
-    app.run(host='0.0.0.0', port=port, debug=False)```
+    app.run(host='0.0.0.0', port=port, debug=False)
