@@ -93,7 +93,7 @@ class DatabaseManager:
         cursor = conn.cursor()
         try:
             cursor.execute("SELECT COUNT(*) FROM users")
-            if cursor.fetchone()[0] > 0:
+            if cursor.fetchone() > 0:
                 print("  - Database already contains data. Skipping sample data insertion.")
                 return
 
